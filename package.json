@@ -57,7 +57,7 @@
     "typescript-eslint": "8.72.0"
   },
   "dependencies": {
-    "ignore": "7.0.5"
+    "ignore": "7.0.12"
   },
   "bin": {
     "codaro-check": "./dist/cli/main.js"
