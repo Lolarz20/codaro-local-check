@@ -55,18 +55,18 @@ for (const [name, method] of [['unreadable', 'openSync'], ['disappearing', 'lsta
 test('strict blocks informational JWT-like findings', async () => { const { root, put } = fixture(); put('example', ['eyJSYNTHETIC', 'eyJSYNTHETIC', 'SYNTHETIC'].join('.')); assert.equal((await audit({ root })).exitCode, 0); assert.equal((await audit({ root, strict: true })).exitCode, 1); });
 test('staged scan reads partially staged index bytes, never working content', async () => {
   const { root, put } = fixture(); init(root); put('with spaces.ts', secret()); git(root, ['add', '--', 'with spaces.ts']); put('with spaces.ts', 'working tree is clean');
-  const report = await audit({ root, staged: true }); assert.equal(report.exitCode, 1); assert.equal(report.filesScanned, 1); assert.equal(report.findings[0].file, 'with spaces.ts');
+  const report = await audit({ root, staged: true }); assert.equal(report.exitCode, 1, JSON.stringify(report)); assert.equal(report.filesScanned, 1); assert.equal(report.findings[0].file, 'with spaces.ts');
   put('with spaces.ts', 'index is clean'); git(root, ['add', '--', 'with spaces.ts']); put('with spaces.ts', secret()); assert.equal((await audit({ root, staged: true })).exitCode, 0);
 });
 test('staged added/deleted/renamed and unusual names are NUL safe', async () => {
   const { root, put } = fixture(); init(root); put('old.ts', 'ok'); put('deleted.ts', 'ok'); git(root, ['add', '.']); git(root, ['commit', '-m', 'synthetic']);
   git(root, ['mv', 'old.ts', 'new name.ts']); git(root, ['rm', 'deleted.ts']);
   const unusual = process.platform === 'win32' ? 'ünicode [name].ts' : 'ünicode\n[name].ts'; put(unusual, secret()); git(root, ['add', '--', unusual]);
-  const report = await audit({ root, staged: true }); assert.equal(report.exitCode, 1); assert.equal(report.filesScanned, 2); assert.equal(report.skippedInputs.filter(s => s.reason === 'staged_deletion').length, 2); assert.equal(report.findings[0].file, unusual);
+  const report = await audit({ root, staged: true }); assert.equal(report.exitCode, 1, JSON.stringify(report)); assert.equal(report.filesScanned, 2); assert.equal(report.skippedInputs.filter(s => s.reason === 'staged_deletion').length, 2); assert.equal(report.findings[0].file, unusual);
 });
 test('staged binary is incomplete and staged ignores are explicit selection', async () => {
   const { root, put } = fixture(); init(root); put('.gitignore', '*.ignored'); put('bad.ignored', secret()); put('binary', Buffer.from([0])); git(root, ['add', '-f', 'bad.ignored', 'binary']);
-  const report = await audit({ root, staged: true }); assert.equal(report.exitCode, 2); assert.equal(report.findings.length, 1); assert.equal(report.skippedInputs[0].reason, 'binary');
+  const report = await audit({ root, staged: true }); assert.equal(report.exitCode, 2, JSON.stringify(report)); assert.equal(report.findings.length, 1); assert.equal(report.skippedInputs[0].reason, 'binary');
 });
 test('no staged changes differs from non-repository and Git failure', async () => {
   const { root } = fixture(); assert.equal((await audit({ root, staged: true })).exitCode, 2);
@@ -80,6 +80,19 @@ test('Git root aliases are resolved before containment checks', async () => {
   fs.symlinkSync(root, alias, process.platform === 'win32' ? 'junction' : 'dir');
   const report = await audit({ root, staged: true }, { git: (args, cwd, maxBuffer) => args[0] === 'rev-parse' ? Buffer.from(alias + '\n') : runGit(args, cwd, maxBuffer) });
   assert.equal(report.exitCode, 1, JSON.stringify(report)); assert.equal(report.filesScanned, 1);
+});
+test('native canonicalization handles legacy spellings without silently dropping staged inputs', async () => {
+  const { root, put } = fixture(); init(root); put('staged.ts', secret()); git(root, ['add', 'staged.ts']);
+  const aliases = fixture(); const alias = join(aliases.root, 'legacy'); fs.symlinkSync(root, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const legacy = path => String(path) === root ? alias : fs.realpathSync(path);
+  legacy.native = fs.realpathSync.native;
+  const report = await audit({ root, staged: true }, { fs: { ...fs, realpathSync: legacy } });
+  assert.equal(report.exitCode, 1, JSON.stringify(report)); assert.equal(report.filesScanned, 1);
+});
+test('Git root outside selected scope is incomplete rather than silently empty', async () => {
+  const { root } = fixture(); init(root); const other = fixture(); init(other.root);
+  const report = await audit({ root, staged: true }, { git: (args, cwd, maxBuffer) => args[0] === 'rev-parse' ? Buffer.from(other.root + '\n') : runGit(args, cwd, maxBuffer) });
+  assert.equal(report.exitCode, 2); assert.equal(report.complete, false);
 });
 test('Windows separators in supplied manifest paths', async () => { const { scan } = await import('../dist/index.js'); const report = await scan({ file: 'src\\package.json', content: '{' }); assert.equal(report.complete, false); });
 test('path separators stay relative in report', async () => { const { root, put } = fixture(); put('nested/a.ts', secret()); const report = await audit({ root, paths: [resolve(root, 'nested/a.ts')] }); assert.equal(report.findings[0].file, 'nested/a.ts'); });

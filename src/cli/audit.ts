@@ -69,11 +69,12 @@ export async function audit(options: AuditOptions, capabilities: AuditCapabiliti
   });
   let root = resolve(options.root);
   let requested: readonly string[] = [];
+  const canonical = (path: string) => String((io.realpathSync.native ?? io.realpathSync)(path));
   function readBounded(path: string, expected: fs.Stats, maximum: number): Buffer {
     const fd = io.openSync(path, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
     try {
       const actual = io.fstatSync(fd);
-      if (!actual.isFile() || actual.dev !== expected.dev || actual.ino !== expected.ino || !inside(root, String(io.realpathSync(path)))) throw new Error('Changed input');
+      if (!actual.isFile() || actual.dev !== expected.dev || actual.ino !== expected.ino || !inside(root, canonical(path))) throw new Error('Changed input');
       const bytes = Buffer.alloc(maximum + 1);
       let length = 0;
       while (length < bytes.length) {
@@ -96,7 +97,7 @@ export async function audit(options: AuditOptions, capabilities: AuditCapabiliti
     if (stat.isSymbolicLink()) { skip(file, 'symlink', true); return; }
     const directory = stat.isDirectory();
     if (file !== '.' && (file.split('/').some(part => generated.has(part)) || !selected(file, directory) || ignored(file, directory, layers))) { skip(file, 'excluded', false); return; }
-    try { if (!inside(root, String(io.realpathSync(path)))) { skip(file, 'outside_root', true); return; } }
+    try { if (!inside(root, canonical(path))) { skip(file, 'outside_root', true); return; } }
     catch { skip(file, 'unreadable_or_missing', true); return; }
     if (directory) {
       let next = layers;
@@ -121,13 +122,14 @@ export async function audit(options: AuditOptions, capabilities: AuditCapabiliti
   try {
     if (!Number.isSafeInteger(limit) || limit <= 0 || limit > 1_048_576 || (options.staged && options.paths?.length)) throw new Error('Invalid options');
     for (const pattern of [...options.include ?? [], ...options.exclude ?? []]) glob(pattern, 'validation');
-    root = String(io.realpathSync(root));
+    root = canonical(root);
     if (!io.lstatSync(root).isDirectory()) throw new Error('Root must be a directory');
     if (options.staged) {
       const git = capabilities.git ?? runGit;
       const staged = stagedEntries(root, git);
       // Git and Node can spell the same Windows directory differently (8.3 aliases/junctions).
-      const indexRoot = String(io.realpathSync(staged.root));
+      const indexRoot = canonical(staged.root);
+      if (!inside(indexRoot, root)) throw new Error('Selected root does not belong to Git root');
       for (const entry of staged.entries) {
         const absolute = resolve(indexRoot, entry.file), file = slash(relative(root, absolute));
         if (!inside(root, absolute)) continue;
