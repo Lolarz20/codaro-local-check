@@ -67,7 +67,8 @@ export async function audit(options: AuditOptions, capabilities: AuditCapabiliti
     const local = layer.base ? file.slice(layer.base.length + 1) : file;
     return local && layer.matcher.ignores(local + (directory ? '/' : ''));
   });
-  let root = resolve(options.root);
+  const declaredRoot = resolve(options.root);
+  let root = declaredRoot;
   let requested: readonly string[] = [];
   const canonical = (path: string) => String((io.realpathSync.native ?? io.realpathSync)(path));
   function readBounded(path: string, expected: fs.Stats, maximum: number): Buffer {
@@ -141,7 +142,11 @@ export async function audit(options: AuditOptions, capabilities: AuditCapabiliti
       }
     } else {
       // Walking the root once loads parent/nested ignores correctly, including for explicit files.
-      requested = options.paths?.length ? options.paths.map(path => resolve(root, path)) : [root];
+      requested = options.paths?.length ? options.paths.map(value => {
+        const path = resolve(declaredRoot, value);
+        // Rebase lexical descendants without resolving/following symlink components.
+        return inside(declaredRoot, path) ? resolve(root, relative(declaredRoot, path)) : path;
+      }) : [root];
       for (const path of requested) if (!inside(root, path)) throw new Error('Path outside root');
       if (requested.some(path => { try { io.lstatSync(path); return false; } catch { return true; } })) throw new Error('Missing selected path');
       await walk(root, []);

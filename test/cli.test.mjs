@@ -48,7 +48,7 @@ test('symlink outside root is never followed', async () => {
   const report = await audit({ root }); assert.equal(report.filesScanned, 0); assert.equal(report.findings.length, 0); assert.equal(report.skippedInputs[0].reason, 'symlink'); assert.equal(report.exitCode, 2);
 });
 for (const [name, method] of [['unreadable', 'openSync'], ['disappearing', 'lstatSync']]) test(`${name} input is incomplete`, async () => {
-  const { root, put } = fixture(); put('gone.ts', 'ok'); const target = join(root, 'gone.ts');
+  const { root, put } = fixture(); put('gone.ts', 'ok'); const target = join(fs.realpathSync.native(root), 'gone.ts');
   const io = { ...fs, [method](path, ...rest) { if (String(path) === target) { const error = new Error('synthetic'); error.code = 'EACCES'; throw error; } return fs[method](path, ...rest); } };
   const report = await audit({ root }, { fs: io }); assert.equal(report.exitCode, 2); assert.ok(report.skippedInputs.length || report.detectorErrors.length);
 });
@@ -93,6 +93,18 @@ test('Git root outside selected scope is incomplete rather than silently empty',
   const { root } = fixture(); init(root); const other = fixture(); init(other.root);
   const report = await audit({ root, staged: true }, { git: (args, cwd, maxBuffer) => args[0] === 'rev-parse' ? Buffer.from(other.root + '\n') : runGit(args, cwd, maxBuffer) });
   assert.equal(report.exitCode, 2); assert.equal(report.complete, false);
+});
+test('explicit absolute selections use the declared root alias consistently', async () => {
+  const { root, put } = fixture(); put('nested/a.ts', secret());
+  const aliases = fixture(); const alias = join(aliases.root, 'legacy'); fs.symlinkSync(root, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const report = await audit({ root: alias, paths: [join(alias, 'nested/a.ts')] });
+  assert.equal(report.exitCode, 1, JSON.stringify(report)); assert.equal(report.findings[0].file, 'nested/a.ts');
+});
+test('explicit selection through a symlink does not follow its parent outside root', async () => {
+  const { root } = fixture(); const outside = fixture(); outside.put('secret.ts', secret());
+  fs.symlinkSync(outside.root, join(root, 'link'), process.platform === 'win32' ? 'junction' : 'dir');
+  const report = await audit({ root, paths: ['link/secret.ts'] });
+  assert.equal(report.exitCode, 2); assert.equal(report.filesScanned, 0); assert.equal(report.skippedInputs[0].reason, 'symlink');
 });
 test('Windows separators in supplied manifest paths', async () => { const { scan } = await import('../dist/index.js'); const report = await scan({ file: 'src\\package.json', content: '{' }); assert.equal(report.complete, false); });
 test('path separators stay relative in report', async () => { const { root, put } = fixture(); put('nested/a.ts', secret()); const report = await audit({ root, paths: [resolve(root, 'nested/a.ts')] }); assert.equal(report.findings[0].file, 'nested/a.ts'); });
