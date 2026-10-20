@@ -1,0 +1,9 @@
+# Completeness model
+
+Completeness is relative to selected content, supported checks and documented exclusions, not proof that a project has no vulnerabilities. Intentional ignores/excludes/generated-directory pruning and staged deletions do not make a scan incomplete. Every other unprocessed input does. Detector failures are retained and force exit 2 even when another detector reports findings.
+
+`filesConsidered = filesScanned + filesSkipped`. A pruned directory is one skipped input entry; descendants are not enumerated or claimed as scanned. Missing selected paths/configuration/Git failures appear in detectorErrors and may have zero considered entries. `detectorsRun` lists unique attempted detectors, including failures after applicability. Failed applicability is recorded as an error before execution. Reports contain UTC timestamps and versioned shape; findings ordering is deterministic for supplied content, but timestamps and filesystem snapshots vary.
+
+Maximum file content is 1 MiB; SDK supplied strings are limited to 1 Mi UTF-16 units. The CLI uses bounded descriptor reads and checks inode/device/realpath plus O_NOFOLLOW where supported; it is a local inspection tool, not an operating-system sandbox. Directory traversal is capped at depth 64 and 100,000 visited entries. No claim is made about immutable snapshots while another process mutates directories. Index blobs are read by object ID rather than working-tree paths.
+
+Git commands have a 10-second timeout and bounded output; very large index diffs can therefore produce an explicit incomplete scan. Invalid UTF-8 content is skipped. Arbitrary non-UTF-8 Git path bytes are unsupported and must not be treated as a successful empty scan. All paths in finding output are relative to the root, with forward slashes. Human formatting quotes paths to prevent newline/control-character confusion.

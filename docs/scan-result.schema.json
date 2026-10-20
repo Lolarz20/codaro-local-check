@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Lolarz20/codaro-local-check/blob/main/docs/scan-result.schema.json",
+  "title": "Codaro Local Check report v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "startedAt",
+    "completedAt",
+    "complete",
+    "filesConsidered",
+    "filesScanned",
+    "filesSkipped",
+    "skippedInputs",
+    "detectorsRun",
+    "detectorErrors",
+    "findings",
+    "onlineChecks",
+    "exitReason",
+    "exitCode"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "toolVersion": {
+      "const": "0.1.0"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "complete": {
+      "type": "boolean"
+    },
+    "filesConsidered": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "filesScanned": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "filesSkipped": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "detectorsRun": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "skippedInputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "reason",
+          "affectsCompleteness"
+        ],
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "affectsCompleteness": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "detectorErrors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "file",
+          "detector",
+          "message"
+        ],
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "detector": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ruleId",
+          "category",
+          "severity",
+          "blocking",
+          "file",
+          "line",
+          "column",
+          "message",
+          "evidence"
+        ],
+        "properties": {
+          "ruleId": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "category": {
+            "enum": [
+              "secret",
+              "dependency",
+              "license"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "info"
+            ]
+          },
+          "blocking": {
+            "type": "boolean"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "column": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "onlineChecks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "status"
+      ],
+      "properties": {
+        "enabled": {
+          "const": false
+        },
+        "status": {
+          "const": "disabled"
+        }
+      }
+    },
+    "exitReason": {
+      "enum": [
+        "completed",
+        "blocking_findings",
+        "incomplete"
+      ]
+    },
+    "exitCode": {
+      "enum": [
+        0,
+        1,
+        2
+      ]
+    }
+  }
+}

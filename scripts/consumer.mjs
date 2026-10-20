@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { scan } from 'codaro-local-check/scan';
+assert.equal((await scan({ file: 'example.ts', content: 'const x = 1;' })).complete, true);
+const root = mkdtempSync(join(tmpdir(), 'codaro-cli-consumer-'));
+writeFileSync(join(root, 'clean.ts'), 'const x = 1;');
+const entry = new URL('./node_modules/codaro-local-check/dist/cli/main.js', import.meta.url);
+const report = JSON.parse(execFileSync(process.execPath, [fileURLToPath(entry), 'audit', '--root', root, '--json'], { encoding: 'utf8' }));
+assert.equal(report.exitCode, 0); assert.equal(report.filesScanned, 1);

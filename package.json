@@ -1,0 +1,65 @@
+{
+  "name": "codaro-local-check",
+  "version": "0.1.0",
+  "description": "Account-free deterministic local code checks with explicit completeness and failure semantics.",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Lolarz20/codaro-local-check.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Lolarz20/codaro-local-check/issues"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./scan": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli/audit.d.ts",
+      "import": "./dist/cli/audit.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist/",
+    "docs/",
+    "examples/",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src",
+    "test": "node --test test/*.test.mjs",
+    "test:coverage": "node --experimental-test-coverage --test test/*.test.mjs",
+    "pack:check": "node scripts/pack-check.mjs",
+    "verify": "npm run clean && npm run typecheck && npm run lint && npm run build && npm run test:coverage && npm run pack:check"
+  },
+  "devDependencies": {
+    "@types/node": "22.18.12",
+    "ajv": "8.20.0",
+    "eslint": "10.13.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.0"
+  },
+  "dependencies": {
+    "ignore": "7.0.5"
+  },
+  "bin": {
+    "codaro-check": "./dist/cli/main.js"
+  }
+}
