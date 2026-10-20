@@ -5,6 +5,7 @@ import { join, resolve } from 'node:path';
 import { audit } from '../dist/cli/audit.js';
 import { formatHuman, formatJson } from '../dist/cli/format.js';
 import { DetectorRegistry } from '../dist/index.js';
+import { runGit } from '../dist/cli/git.js';
 import { fixture, secret, cli, git, init } from './helpers.mjs';
 test('CLI actual invocation, version and rules', () => { const { root } = fixture(); assert.equal(cli(root, ['version']).stdout.trim(), '0.1.0'); assert.equal(cli(root, ['rules']).status, 0); assert.equal(cli(root, ['--help']).status, 0); assert.equal(cli(root, ['unknown']).status, 2); });
 test('exit 0 clean, exit 1 blocking, exit 2 incomplete and versioned JSON', async () => {
@@ -73,5 +74,12 @@ test('no staged changes differs from non-repository and Git failure', async () =
   const failure = await audit({ root, staged: true }, { git: () => { throw new Error(secret()); } }); assert.equal(failure.exitCode, 2); assert.ok(!JSON.stringify(failure).includes(secret()));
 });
 test('staged explicit path option is rejected rather than ignored', async () => { const { root } = fixture(); assert.equal((await audit({ root, staged: true, paths: ['x'] })).exitCode, 2); });
+test('Git root aliases are resolved before containment checks', async () => {
+  const { root, put } = fixture(); init(root); put('staged.ts', secret()); git(root, ['add', 'staged.ts']);
+  const aliases = fixture(); const alias = join(aliases.root, 'alias');
+  fs.symlinkSync(root, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  const report = await audit({ root, staged: true }, { git: (args, cwd, maxBuffer) => args[0] === 'rev-parse' ? Buffer.from(alias + '\n') : runGit(args, cwd, maxBuffer) });
+  assert.equal(report.exitCode, 1, JSON.stringify(report)); assert.equal(report.filesScanned, 1);
+});
 test('Windows separators in supplied manifest paths', async () => { const { scan } = await import('../dist/index.js'); const report = await scan({ file: 'src\\package.json', content: '{' }); assert.equal(report.complete, false); });
 test('path separators stay relative in report', async () => { const { root, put } = fixture(); put('nested/a.ts', secret()); const report = await audit({ root, paths: [resolve(root, 'nested/a.ts')] }); assert.equal(report.findings[0].file, 'nested/a.ts'); });

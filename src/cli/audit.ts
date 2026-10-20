@@ -126,8 +126,10 @@ export async function audit(options: AuditOptions, capabilities: AuditCapabiliti
     if (options.staged) {
       const git = capabilities.git ?? runGit;
       const staged = stagedEntries(root, git);
+      // Git and Node can spell the same Windows directory differently (8.3 aliases/junctions).
+      const indexRoot = String(io.realpathSync(staged.root));
       for (const entry of staged.entries) {
-        const absolute = resolve(staged.root, entry.file), file = slash(relative(root, absolute));
+        const absolute = resolve(indexRoot, entry.file), file = slash(relative(root, absolute));
         if (!inside(root, absolute)) continue;
         if (entry.deleted) { skip(file, 'staged_deletion', false); continue; }
         if (!selected(file)) { skip(file, 'excluded', false); continue; }
